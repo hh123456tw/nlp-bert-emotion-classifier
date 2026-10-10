@@ -1,13 +1,11 @@
 """
 infer_bert.py
 
-載入 train_bert.py 儲存的最佳 BERT binary classifier，
-對新的繁體中文評論進行情感分類。
+載入 train_bert.py 儲存的最佳 BERT 8 類情緒分類模型，
+對新的中文句子進行情緒分類。
 
-預設 label：
-
-    0 → NEGATIVE
-    1 → POSITIVE
+label 名稱已存在模型的 config 裡（id2label），
+所以預測結果直接是中文，例如「開心語調」，不用另外讀 labels.json。
 """
 
 from pathlib import Path

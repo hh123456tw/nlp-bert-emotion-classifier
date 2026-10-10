@@ -4,11 +4,11 @@ plot_bert_metrics.py
 讀取 train_bert.py 產生的 trainer_state.json，
 輸出：
 
-    output/bert_binary_clf/loss_curve.png
+    output/bert_emotion_clf/loss_curve.png
 
 以及如果 log_history 中有 eval_f1：
 
-    output/bert_binary_clf/f1_curve.png
+    output/bert_emotion_clf/f1_curve.png
 
 這個版本適合 VS Code + Google Colab Extension 的 remote terminal。
 

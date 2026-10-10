@@ -84,6 +84,20 @@ python infer_bert.py         # 預測句子，輸出「句子 => 標籤 (score)�
 ![loss](output/bert_emotion_clf/loss_curve.png)
 ![f1](output/bert_emotion_clf/f1_curve.png)
 
+## 學習心得
+這次是在 Claude Code 的一步一步帶領下完成的：它負責說明觀念與檢查，我自己動手改 `prepare_data.py`，再依指引修改其他程式。README 初稿、`infer_bert.py` 的輸出格式與程式註解的更新，是由 Claude Code 協助完成。
+
+我在 `prepare_data.py` 親手做的部分：
+- 把 `csv.reader` 改成 `csv.DictReader`，用欄位名稱 `row["text"]`、`row["emotion"]` 取值
+- 用 `sorted(set(labels))` 找出 8 個不重複且順序固定的標籤
+- 用 `enumerate` 與迴圈建立 `label2id`，再用 list comprehension 把 4159 個中文標籤轉成整數
+
+過程中遇到並理解的問題：
+- `KeyError: 0`、`KeyError: 1`：`DictReader` 給的是 dict，不能再用位置取值
+- `label_name = set()` 後面又被 `label_name = labels` 蓋掉，等於白建
+- 縮排放錯，讓 `label = ...` 跑到 `continue` 後面，永遠不會執行
+- `set` 沒有固定順序，所以編號前一定要先 `sorted`，否則每次執行編號都可能不同
+
 ## 專案結構
 ```
 data/

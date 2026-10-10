@@ -1,27 +1,29 @@
 """
 prepare_data.py
 
-把原始 reviews.txt 轉成 BERT 二元分類訓練所需的 train / validation JSONL。
+把原始 data.csv 轉成 BERT 8 類情緒分類訓練所需的 train / validation JSONL。
 
-原始資料格式是一行一筆：
+原始資料是 CSV，第一列是標題，之後一行一筆：
 
-    "評論文字"    1
-    "評論文字"    0
+    text,emotion
+    你要不要去吃午餐？,平淡語氣
+    誒誒誒！我甄選上了！,開心語調
 
-中間使用 Tab（\t）分隔。
+emotion 是中文標籤，共 8 種，微調時必須轉成整數 0–7。
 
 這支程式做的事情：
 
-    reviews.txt
+    data/data.csv
         ↓
-    讀取文字與 label
+    讀取文字與 emotion
         ↓
-    檢查格式
+    標籤排序後編號 0–7（label2id）
         ↓
     以 label 做 stratified train / validation split
         ↓
     data/bert/train.jsonl
     data/bert/valid.jsonl
+    data/bert/labels.json（label2id 對照表）
 
 為什麼要先獨立做資料切分？
 
@@ -34,8 +36,8 @@ prepare_data.py
 # =============================================================================
 
 # csv：
-# 原始 reviews.txt 的文字欄位被雙引號包起來，而且使用 Tab 分隔。
-# 使用 csv.reader 比手動 split("\t") 更穩定，也會自動移除外層雙引號。
+# 原始 data.csv 以逗號分隔，第一列是標題（text,emotion）。
+# 使用 csv.DictReader 可以直接用欄位名稱取值，並自動略過標題列。
 import csv
 
 # json：
@@ -43,7 +45,7 @@ import csv
 import json
 
 # Counter：
-# 用來統計 label 0 / 1 各有多少筆。
+# 用來統計每個 label 各有多少筆。
 from collections import Counter
 
 # Path：
@@ -54,7 +56,7 @@ from pathlib import Path
 # 用來切 training / validation。
 #
 # 這裡使用 stratify=labels，
-# 讓 train 與 validation 的 0 / 1 比例盡量接近原始資料。
+# 讓 train 與 validation 裡 8 個類別的比例盡量接近原始資料。
 from sklearn.model_selection import train_test_split
 
 # =============================================================================
@@ -104,7 +106,7 @@ def load_reviews(path: Path):
     texts = []
     labels = []
 
-    # 記錄被略過的空評論行號。
+    # 記錄被略過的空句子行號。
     #
     # 這些 row 雖然可能帶有 label，
     # 但沒有任何文字內容，
@@ -112,15 +114,15 @@ def load_reviews(path: Path):
     skipped_empty_rows = []
 
     # newline="" 是 csv 模組官方建議的開檔方式，
-    # 可以讓 csv.reader 正確處理換行。
+    # 可以讓 csv 模組正確處理換行。
     with path.open("r", encoding="utf-8", newline="") as file:
 
-        # delimiter="\t"：
-        #     使用 Tab 分隔欄位。
+        # delimiter=","：
+        #     使用逗號分隔欄位。
         #
         # quotechar='"'：
-        #     文字欄位外層的雙引號由 csv.reader 處理，
-        #     不會把雙引號本身留下來當成評論文字。
+        #     文字欄位外層的雙引號由 csv 模組處理，
+        #     不會把雙引號本身留下來當成句子內容。
         reader = csv.DictReader(
             file,
             delimiter=",",
@@ -136,17 +138,17 @@ def load_reviews(path: Path):
             text = row["text"].strip()
 
             # -------------------------------------------------------------
-            # 空評論直接略過
+            # 空句子直接略過
             # -------------------------------------------------------------
             #
-            # 原始 reviews.txt 中可能存在：
+            # 原始資料中如果存在：
             #
-            #     ""\t0
+            #     ,開心語調
             #
             # 也就是：
             #
-            #     評論文字 = 空字串
-            #     label    = 0
+            #     text    = 空字串
+            #     emotion = 開心語調
             #
             # 這種資料沒有任何文字資訊可以讓 BERT 學習，
             # 因此不應該拿去做訓練。
@@ -169,13 +171,13 @@ def load_reviews(path: Path):
     if not texts:
         raise RuntimeError(f"{path} 沒有讀到任何有效資料。")
 
-    # 顯示空評論清理結果。
+    # 顯示空句子清理結果。
     #
     # 這不是 training error，
     # 而是資料清理的一部分。
     if skipped_empty_rows:
         print(
-            "已略過空評論："
+            "已略過空句子："
             f"{len(skipped_empty_rows)} 筆；"
             f"原始行號={skipped_empty_rows}"
         )
@@ -216,7 +218,7 @@ def save_jsonl(texts, labels, path: Path):
 
 def print_label_distribution(name, labels):
     """
-    顯示 0 / 1 的資料量與比例。
+    顯示每個 label 的資料量與比例。
     """
 
     counts = Counter(labels)
@@ -246,7 +248,7 @@ def main():
         raise FileNotFoundError(f"找不到原始資料：{INPUT_FILE.resolve()}")
 
     # -------------------------------------------------------------------------
-    # Step 2：讀取 reviews.txt
+    # Step 2：讀取 data.csv，並把中文標籤轉成整數
     # -------------------------------------------------------------------------
 
     texts, labels = load_reviews(INPUT_FILE)

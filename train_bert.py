@@ -1,7 +1,7 @@
 """
 train_bert.py
 
-使用 google-bert/bert-base-chinese 做繁體中文評論二元分類 Fine-tuning。
+使用 google-bert/bert-base-chinese 做中文句子 8 類情緒分類 Fine-tuning。
 
 資料來源：
 
@@ -34,7 +34,7 @@ train_bert.py
         ↓
     Best Checkpoint
         ↓
-    output/bert_binary_clf/
+    output/bert_emotion_clf/
 
 這支程式保留原 notebook 的主要訓練設定，
 並補上幾個較適合正式 fine-tuning 的處理：
@@ -97,10 +97,14 @@ OUTPUT_DIR = Path("output/bert_emotion_clf")
 # 3. 模型設定
 # =============================================================================
 
-# 二元分類：
+# 8 類情緒分類：
 #
-#     0 = negative
-#     1 = positive
+# label 與整數的對照由 prepare_data.py 產生，存在 data/bert/labels.json：
+#
+#     0 = 厭惡語調    4 = 疑問語調
+#     1 = 平淡語氣    5 = 開心語調
+#     2 = 悲傷語調    6 = 關切語調
+#     3 = 憤怒語調    7 = 驚奇語調
 NUM_LABELS = 8
 
 with (DATA_DIR / "labels.json").open(encoding="utf-8") as file:
@@ -316,10 +320,9 @@ def compute_metrics(eval_pred):
         shape 通常是：
             [batch_size, num_labels]
 
-        二元分類時例如：
+        8 類分類時，每一筆有 8 個 logits，例如：
             [
-                [2.1, -0.5],
-                [-1.0, 3.2],
+                [0.2, 1.1, -0.5, 0.0, -1.2, 3.2, 0.4, -0.3],
                 ...
             ]
 
@@ -332,11 +335,8 @@ def compute_metrics(eval_pred):
 
     例如：
 
-        [2.1, -0.5]
-            → class 0
-
-        [-1.0, 3.2]
-            → class 1
+        [0.2, 1.1, -0.5, 0.0, -1.2, 3.2, 0.4, -0.3]
+            → class 5（開心語調）
     """
 
     labels = eval_pred.label_ids
@@ -353,8 +353,8 @@ def compute_metrics(eval_pred):
         axis=-1,
     )
 
-    # binary F1：
-    # 預設把 label=1 視為 positive class。
+    # macro F1：
+    # 8 個類別各自算一個 F1，再取平均，每個類別同等重要。
     f1 = f1_score(
         labels,
         preds,
@@ -519,7 +519,7 @@ def main():
         #
         # 如果你想完全重新訓練，最乾淨的方法是先自行刪除：
         #
-        #     rm -rf output/bert_binary_clf
+        #     rm -rf output/bert_emotion_clf
         #
         # 再執行本程式。
         output_dir=str(OUTPUT_DIR),
